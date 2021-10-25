@@ -13,7 +13,7 @@ Features
 --------
 
 * Command-line action!
-* Dumps the results of the LookupAccountSid() and, for real user accounts, NetUserGetInfo() Windows APIs as JSON.  Easily consumed by most programming and scripting languages.
+* Dumps the results of the LookupAccountSid()/LookupAccountName() and NetUserGetInfo() Windows APIs as JSON.  Easily consumed by most programming and scripting languages.
 * Pre-built binaries using Visual Studio (statically linked C++ runtime, minimal file size of ~112K, direct Win32 API calls).
 * Windows subsystem variant.
 * Unicode support.
@@ -28,7 +28,7 @@ Running the command with the `/?` option will display the options:
 ```
 (C) 2021 CubicleSoft.  All Rights Reserved.
 
-Syntax:  getsidinfo.exe [options] SID [SID2] [SID3] ...
+Syntax:  getsidinfo.exe [options] SIDorAcct [SID2orAcct] [SID3orAcct] ...
 
 Options:
         /v
@@ -53,12 +53,15 @@ T2                  S-1-5-21-1304824241-3403877634-2989090281-1003
 WDAGUtilityAccount  S-1-5-21-1304824241-3403877634-2989090281-504
 
 C:\>getsidinfo S-1-5-21-1304824241-3403877634-2989090281-1003 S-1-5-32-544
-{"S-1-5-21-1304824241-3403877634-2989090281-1003": {"success": true, "domain": "MY-PC", "account": "T2", "type": 1, "net_info": {"full_name": "", "comment": "", "user_comment": "", "password_age": 5855194, "password_expired": 0, "bad_passwords": 0, "num_logons": 4, "priv_level": 1, "flags": 66081, "auth_flags": 0, "home_dir": "", "home_dir_drive": "", "profile": "", "script_path": "", "params": "", "workstations": "", "last_logon": 1612641291, "last_logoff": 0, "acct_expires": -1, "disk_quota": -1, "units_per_week": 168, "logon_hours": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "logon_server": "\\\\*", "country_code": 0, "code_page": 0, "primary_group_id": 513, "internet_identity": false}},
+{"S-1-5-21-1304824241-3403877634-2989090281-1003": {"success": true, "sid": "S-1-5-21-1304824241-3403877634-2989090281-1003", "domain": "MY-PC", "account": "T2", "type": 1, "net_info": {"full_name": "", "comment": "", "user_comment": "", "password_age": 5855194, "password_expired": 0, "bad_passwords": 0, "num_logons": 4, "priv_level": 1, "flags": 66081, "auth_flags": 0, "home_dir": "", "home_dir_drive": "", "profile": "", "script_path": "", "params": "", "workstations": "", "last_logon": 1612641291, "last_logoff": 0, "acct_expires": -1, "disk_quota": -1, "units_per_week": 168, "logon_hours": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "logon_server": "\\\\*", "country_code": 0, "code_page": 0, "primary_group_id": 513, "internet_identity": false, "reg_profile_path": "C:\\Users\\T2"}},
 
-"S-1-5-32-544": {"success": true, "domain": "BUILTIN", "account": "Administrators", "type": 4}}
+"S-1-5-32-544": {"success": true, "sid": "S-1-5-32-544", "domain": "BUILTIN", "account": "Administrators", "type": 4}}
+
+C:\>getsidinfo MY-PC\Guest
+{"MY-PC\\Guest": {"success": true, "sid": "S-1-5-21-1304824241-3403877634-2989090281-501", "domain": "MY-PC", "account": "Guest", "type": 1, "net_info": {"full_name": "", "comment": "Built-in account for guest access to the computerdomain", "user_comment": "", "password_age": 0, "password_expired": 0, "bad_passwords": 0, "num_logons": 0, "priv_level": 0, "flags": 66147, "auth_flags": 0, "home_dir": "", "home_dir_drive": "", "profile": "", "script_path": "", "params": "", "workstations": "", "last_logon": 0, "last_logoff": 0, "acct_expires": -1, "disk_quota": -1, "units_per_week": 168, "logon_hours": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "logon_server": "\\\\*", "country_code": 0, "code_page": 0, "primary_group_id": 513, "internet_identity": false}}}
 ```
 
-The second command dumps information about two SIDs - one user account and the BUILTIN\Administrators group.
+The second command dumps information about two SIDs - one user account and the BUILTIN\Administrators group.  The third command dumps information using an account name instead of SID.
 
 Windows Subsystem Variant
 -------------------------

@@ -20,6 +20,7 @@
 #include "utf8/utf8_util.h"
 #include "utf8/utf8_file_dir.h"
 #include "utf8/utf8_mixed_var.h"
+#include "templates/static_wc_mixed_var.h"
 #include "json/json_serializer.h"
 
 #ifdef SUBSYSTEM_WINDOWS
@@ -51,7 +52,7 @@ void DumpSyntax(TCHAR *currfile)
 
 	_tprintf(_T("(C) 2021 CubicleSoft.  All Rights Reserved.\n\n"));
 
-	_tprintf(_T("Syntax:  %s [options] SID [SID2] [SID3] ...\n\n"), currfile);
+	_tprintf(_T("Syntax:  %s [options] SIDorAcct [SIDorAcct2] [SIDorAcct3] ...\n\n"), currfile);
 
 	_tprintf(_T("Options:\n"));
 
@@ -111,6 +112,7 @@ void DumpErrorMsg(CubicleSoft::UTF8::File &OutputFile, CubicleSoft::JSON::Serial
 
 struct SidInfo {
 	PSID MxSid;
+	BYTE MxSidBuffer[256];
 	TCHAR MxDomainName[1024];
 	TCHAR MxAccountName[1024];
 	SID_NAME_USE MxSidType;
@@ -200,11 +202,13 @@ int _tmain(int argc, TCHAR **argv)
 	OutputJSON.SetBuffer((std::uint8_t *)outputbuffer, sizeof(outputbuffer));
 	OutputJSON.StartObject();
 
+	BOOL result2;
 	SidInfo TempSidInfo;
-	DWORD acctbuffersize, domainbuffersize;
+	DWORD sidbuffersize, acctbuffersize, domainbuffersize;
 	NET_API_STATUS netstatus;
 	LPUSER_INFO_4 userinfo4;
 	LPUSER_INFO_24 userinfo24;
+	HKEY regkey;
 	int x2;
 
 	for (; x < argc; x++)
@@ -214,7 +218,33 @@ int _tmain(int argc, TCHAR **argv)
 		OutputJSON.StartObject(TempVar.GetStr());
 		OutputJSON.SetValSplitter(", ");
 
-		if (!::ConvertStringSidToSid(argv[x], &TempSidInfo.MxSid))  DumpErrorMsg(OutputFile, OutputJSON, "Unable to convert string to a SID.", "conversion_failed", ::GetLastError());
+		result2 = ::ConvertStringSidToSid(argv[x], &TempSidInfo.MxSid);
+		if (!result2)
+		{
+			TempSidInfo.MxSid = (PSID)TempSidInfo.MxSidBuffer;
+			sidbuffersize = sizeof(TempSidInfo.MxSidBuffer) / sizeof(BYTE);
+			domainbuffersize = sizeof(TempSidInfo.MxDomainName) / sizeof(TCHAR);
+
+			result2 = ::LookupAccountName(systemname, argv[x], TempSidInfo.MxSid, &sidbuffersize, TempSidInfo.MxDomainName, &domainbuffersize, &TempSidInfo.MxSidType);
+			if (result2)
+			{
+				if (!::IsValidSid(TempSidInfo.MxSid))  result2 = FALSE;
+				else
+				{
+					LPTSTR tempstrsid = NULL;
+
+					if (!::ConvertSidToStringSid(TempSidInfo.MxSid, &tempstrsid))  result2 = FALSE;
+					else
+					{
+						TempVar.SetUTF8(tempstrsid);
+
+						::LocalFree(tempstrsid);
+					}
+				}
+			}
+		}
+
+		if (!result2)  DumpErrorMsg(OutputFile, OutputJSON, "Unable to convert string to a SID or Account.", "conversion_failed", ::GetLastError());
 		else
 		{
 			acctbuffersize = sizeof(TempSidInfo.MxAccountName) / sizeof(TCHAR);
@@ -224,6 +254,14 @@ int _tmain(int argc, TCHAR **argv)
 			else
 			{
 				OutputJSON.AppendBool("success", true);
+
+				OutputJSON.AppendStr("sid", TempVar.GetStr());
+
+				// Build the registry key string for later.
+				CubicleSoft::StaticWCMixedVar<WCHAR[1024]> TempVar2;
+
+				TempVar2.SetStr(_T("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\"));
+				TempVar2.AppendStr(TempVar.GetStr());
 
 				TempVar.SetUTF8(TempSidInfo.MxDomainName);
 				OutputJSON.AppendStr("domain", TempVar.GetStr());
@@ -325,6 +363,25 @@ int _tmain(int argc, TCHAR **argv)
 					if (userinfo4 != NULL)  ::NetApiBufferFree(userinfo4);
 
 					OutputJSON.EndObject();
+				}
+
+				// Add registry profile image path (if any).
+				if (::RegOpenKeyExW(HKEY_LOCAL_MACHINE, TempVar2.GetStr(), 0, KEY_READ, &regkey) == ERROR_SUCCESS)
+				{
+					TCHAR pathbuffer[1024], pathbuffer2[1024];
+					DWORD pathbuffersize = sizeof(pathbuffer) / sizeof(TCHAR);
+
+					if (::RegQueryValueEx(regkey, _T("ProfileImagePath"), NULL, NULL, (LPBYTE)pathbuffer, &pathbuffersize) == ERROR_SUCCESS)
+					{
+						pathbuffer[pathbuffersize] = _T('\0');
+
+						::ExpandEnvironmentStrings(pathbuffer, pathbuffer2, sizeof(pathbuffer2));
+
+						TempVar.SetUTF8(pathbuffer2);
+						OutputJSON.AppendStr("reg_profile_path", TempVar.GetStr());
+					}
+
+					::RegCloseKey(regkey);
 				}
 			}
 
