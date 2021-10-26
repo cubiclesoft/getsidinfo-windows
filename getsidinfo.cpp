@@ -386,9 +386,9 @@ int _tmain(int argc, TCHAR **argv)
 			}
 
 			::LocalFree(TempSidInfo.MxSid);
-		}
 
-		DumpOutput(OutputFile, OutputJSON);
+			DumpOutput(OutputFile, OutputJSON);
+		}
 
 		OutputJSON.EndObject();
 	}
